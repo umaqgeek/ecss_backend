@@ -1,0 +1,11 @@
+ipserver:10.73.32.200
+port:1099
+status:1
+thread:1
+
+development ip = 10.73.32.200
+staging ip = 210.48.157.104 / biocore.utem.edu.my
+vm ip = 210.48.157.126
+
+status 1 = use hostname
+status 2 = don't use hostname
