@@ -612,7 +612,89 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
             for (int i = 0; i <= 29; i++) {
                 ps.setString(i + 1, queue[i]);
             }
+            // execute query insert pms_episode
             ps.execute();
+            
+            String ppq_hfc_cd = queue[29];
+            String ppq_queue_name = queue[16];
+            String ppq_episode_date = queue[1];
+            String ppq_user_id = "";
+            String ppq_pmi_no = queue[0];
+            
+            int last_queue_no = 1;
+            
+            String sql_plqn = "SELECT last_queue_no "
+                    + "FROM pms_last_queue_no "
+                    + "WHERE hfc_cd = ? "
+                    + "AND queue_name = ? "
+                    + "AND DATE(episode_date) = DATE(?) "
+                    + "ORDER BY last_queue_no DESC";
+            PreparedStatement ps_plqn = conn.prepareStatement(sql_plqn);
+            ps_plqn.setString(1, ppq_hfc_cd);
+            ps_plqn.setString(2, ppq_queue_name);
+            ps_plqn.setString(3, ppq_episode_date);
+            ResultSet rs_plqn = ps_plqn.executeQuery();
+            boolean isExist = rs_plqn.next();
+            if (isExist) {
+                try {
+                    last_queue_no = Integer.parseInt(rs_plqn.getString("last_queue_no")) + 1;
+                } catch (Exception e) {
+                    last_queue_no = 1;
+                }
+            } else {
+                last_queue_no = 1;
+            }
+            String sql_plqn2 = "";
+            PreparedStatement ps_plqn2;
+            if (isExist) {
+                sql_plqn2 = "UPDATE pms_last_queue_no "
+                        + "SET last_queue_no = ? "
+                        + "WHERE hfc_cd = ? "
+                        + "AND queue_name = ? "
+                        + "AND DATE(episode_date) = DATE(?)";
+            } else {
+                sql_plqn2 = "INSERT INTO pms_last_queue_no(hfc_cd, queue_name, episode_date, last_queue_no) "
+                        + "VALUES(?, ?, ?, ?) ";
+            }
+            ps_plqn2 = conn.prepareStatement(sql_plqn2);
+            if (isExist) {
+                ps_plqn2.setString(1, last_queue_no+"");
+                ps_plqn2.setString(2, ppq_hfc_cd);
+                ps_plqn2.setString(3, ppq_queue_name);
+                ps_plqn2.setString(4, ppq_episode_date);
+            } else {
+                ps_plqn2.setString(1, ppq_hfc_cd);
+                ps_plqn2.setString(2, ppq_queue_name);
+                ps_plqn2.setString(3, ppq_episode_date);
+                ps_plqn2.setString(4, last_queue_no+"");
+            }
+            // execute update or insert last queue no
+            ps_plqn2.execute();
+            
+            // get queue type from queue name
+            String sql_pqn = "SELECT queue_type "
+                    + "FROM pms_queue_name "
+                    + "WHERE queue_name = ? ";
+            PreparedStatement ps_pqn = conn.prepareStatement(sql_pqn);
+            ps_pqn.setString(1, ppq_queue_name);
+            ResultSet rs_pqn = ps_pqn.executeQuery();
+            String queue_type = "";
+            if (rs_pqn.next()) {
+                queue_type = rs_pqn.getString("queue_type");
+            }
+            
+            String sql_ppq = "INSERT INTO pms_patient_queue(hfc_cd, queue_name, episode_date, pmi_no, queue_no, queue_type) "
+                    + "VALUES(?, ?, ?, ?, ?, ?) ";
+            PreparedStatement ps_ppq = conn.prepareStatement(sql_ppq);
+            ps_ppq.setString(1, ppq_hfc_cd);
+            ps_ppq.setString(2, ppq_queue_name);
+            ps_ppq.setString(3, ppq_episode_date);
+            ps_ppq.setString(4, ppq_pmi_no);
+            ps_ppq.setString(5, last_queue_no+"");
+            ps_ppq.setString(6, queue_type);
+            // insert patient queue
+            ps_ppq.execute();
+            
             S.oln("Insert Queue Success...");
         } catch (Exception e) {
             S.oln("Error: " + e.getMessage());
@@ -849,19 +931,26 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
     
     private static boolean isDateToday(String date) {
         boolean stat = false;
-        Calendar today = Calendar.getInstance();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
-        String now = dateFormat.format(today.getTime());
-        String str1[] = date.split("/");
-        String day1 = str1[0];
-        String month1 = str1[1];
-        String year1 = str1[2];
-        String str2[] = now.split("/");
-        String day2 = str2[0];
-        String month2 = str2[1];
-        String year2 = str2[2];
-        if (day1.equals(day2) && month1.equals(month2) && year1.equals(year2)) {
-            stat = true;
+        try {
+            Calendar today = Calendar.getInstance();
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String now = dateFormat.format(today.getTime());
+            String str1x[] = date.split(" ");
+            String str1[] = str1x[0].split("-");
+            String day1 = str1[2];
+            String month1 = str1[1];
+            String year1 = str1[0];
+            String str2x[] = now.split(" ");
+            String str2[] = str2x[0].split("-");
+            String day2 = str2[2];
+            String month2 = str2[1];
+            String year2 = str2[0];
+            if (day1.equals(day2) && month1.equals(month2) && year1.equals(year2)) {
+                stat = true;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            stat = false;
         }
         return stat;
     }
@@ -869,14 +958,28 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
     public Vector getQueueNameList(String name, String hfcCode, int tanda) throws RemoteException {
         Vector<Vector<String>> QueueVector = new Vector<Vector<String>>();
         try {
-            String sql = "SELECT PMI_NO,NAME,EPISODE_TIME,CONSULTATION_ROOM,DOCTOR,"
-                    + "STATUS,EPISODE_DATE FROM PMS_EPISODE "
-                    + "WHERE NAME LIKE upper(?) "
-                    + "AND HEALTH_FACILITY_CODE = ? "
+            String sql = "SELECT "
+                    
+                    + "PE.PMI_NO," //1
+                    + "PE.NAME," //2
+                    + "PE.EPISODE_TIME," //3
+                    + "PE.CONSULTATION_ROOM," //4
+                    + "PE.DOCTOR," //5
+                    + "PE.STATUS," //6
+                    + "PE.EPISODE_DATE, " //7
+                    + "PPQ.QUEUE_NAME, " //8
+                    + "PPQ.QUEUE_NO " //9
+                    
+                    + "FROM PMS_EPISODE PE, PMS_PATIENT_QUEUE PPQ "
+                    + "WHERE PE.HEALTH_FACILITY_CODE = PPQ.HFC_CD "
+                    + "AND PE.EPISODE_DATE = PPQ.EPISODE_DATE "
+                    + "AND PE.PMI_NO = PPQ.PMI_NO "
+                    + "AND PE.NAME LIKE upper(?) "
+                    + "AND PE.HEALTH_FACILITY_CODE = ? "
                     //+ "AND STATUS NOT LIKE 'Consult' "
-                    + "AND STATUS NOT LIKE 'Discharge' "
-                    + "AND STATUS NOT LIKE 'Missing' "
-                    + "ORDER BY EPISODE_TIME ASC";
+                    + "AND PE.STATUS NOT LIKE 'Discharge' "
+                    + "AND PE.STATUS NOT LIKE 'Missing' "
+                    + "ORDER BY PE.EPISODE_TIME ASC";
             PreparedStatement ps = Conn.MySQLConnect().prepareStatement(sql);
             name = "%" + name + "%";
             ps.setString(1, name);
@@ -889,7 +992,8 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
                     queue.add(rs.getString(1));//pmino
                     queue.add(rs.getString(2));//name
                     queue.add(rs.getString(3));//time
-                    queue.add(rs.getString(4));//room
+                    queue.add(rs.getString(8));//queue name
+                    queue.add(rs.getString(9));//queue no
                     queue.add(rs.getString(5));//doctor
                     queue.add(rs.getString(6));//status
                     
@@ -2558,7 +2662,7 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
                     + "FROM PMS_EPISODE "
                     + "WHERE PMI_NO = ? "
                     + "AND (STATUS NOT LIKE 'Consult' OR (STATUS LIKE 'Consult' AND DOCTOR = ?)) "
-                    + "AND EPISODE_DATE = ? "
+                    + "AND DATE(EPISODE_DATE) = DATE(?) "
                     + "AND (DOCTOR = ? OR DOCTOR = '-') ";
             if (!time.equals("")) {
                 sql1 += "AND EPISODE_TIME = ? ";
@@ -2568,7 +2672,8 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
             ps1.setString(1, pmino);
             ps1.setString(2, doctor);
             java.util.Date date = new java.util.Date();
-            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+//            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             ps1.setString(3, sdf.format(date));
             ps1.setString(4, doctor);
             
@@ -3578,7 +3683,8 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
         boolean status = false;
         try {
             java.util.Date date = new java.util.Date();
-            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+//            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             String sql = "SELECT * "
                     + "FROM PMS_EPISODE "
                     + "WHERE PMI_NO = ? "
@@ -3586,7 +3692,7 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
                     + "OR STATUS LIKE '%Waiting%' "
                     + "OR STATUS LIKE '%Hold%' "
                     + "OR STATUS LIKE '%Second Opinion%') "
-                    + "AND EPISODE_DATE = ? ";
+                    + "AND DATE(EPISODE_DATE) = DATE(?) ";
             PreparedStatement ps = Conn.MySQLConnect().prepareStatement(sql);
             ps.setString(1, pmino);
             ps.setString(2, sdf.format(date));
