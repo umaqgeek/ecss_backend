@@ -282,14 +282,24 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
         return numb;
     }
     
+    private final static String status_new = "New";
+    private final static String status_partial = "Partial";
+    private final static String status_complete_partial = "Complete Partial";
+    private final static String status_full = "Full Complete";
+    
     public String insertDTOMaster(String PMI, String dataDTO) {
         Connection conn = null;
         String order_no = "0000000";
         
-        Calendar c = Calendar.getInstance();
-        int tahun = c.get(c.YEAR);
-        String year = String.valueOf(tahun).split("")[3]+""
-                +String.valueOf(tahun).split("")[4];
+//        Calendar c = Calendar.getInstance();
+//        int tahun = c.get(c.YEAR);
+        java.util.Date tahunini = new java.util.Date();
+        SimpleDateFormat sdf1 = new SimpleDateFormat("yyyy");
+        SimpleDateFormat sdf2 = new SimpleDateFormat("yy");
+        int tahun = Integer.parseInt(sdf1.format(tahunini));
+//        String year = String.valueOf(tahun).split("")[3]+""
+//                +String.valueOf(tahun).split("")[4];
+        String year = sdf2.format(tahunini);
         
         MainRetrieval mr = new MainRetrieval();
         mr.startProcess(dataDTO);
@@ -1635,7 +1645,7 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
     }
 
     public boolean insertDispenseMaster(String[] data1, 
-            java.sql.Timestamp data2, boolean data3) throws RemoteException {
+            String data2, boolean data3) throws RemoteException {
         boolean stat = false;
         try {
             String in1 = "INSERT INTO PIS_DISPENSE_MASTER"
@@ -1648,7 +1658,7 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
             ins1.setString(2, data1[1]);
             ins1.setString(3, data1[2]);
             ins1.setString(4, data1[3]);
-            ins1.setTimestamp(5, data2);
+            ins1.setString(5, data2);
             ins1.setString(6, data1[4]);
             ins1.setString(7, data1[5]);
             ins1.setString(8, data1[6]);
@@ -1703,7 +1713,7 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
     }
 
     public boolean updateOrderDetail(int qtyDispensed, String orderNo, 
-            String drugCode) throws RemoteException {
+            String drugCode, String statusDrug) throws RemoteException {
         boolean stat = false;
         try {
             String sql = "SELECT QTY_ORDERED, QTY_DISPENSED "
@@ -1807,15 +1817,20 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
                 }
                 // * * * * * * * * * * * * * * * * *
                 try{
-                    String oS = "Partial";
+                    String oS = statusDrug;
                     sql = "UPDATE PIS_ORDER_DETAIL "
-                            + "SET QTY_DISPENSED = ?, ORDER_STATUS = ? "
+                            + "SET QTY_DISPENSED = ?, ORDER_STATUS = ?, STATUS = ? "
                             + "WHERE ORDER_NO = ? AND DRUG_ITEM_CODE = ? ";
                     PreparedStatement ps2 = Conn.MySQLConnect().prepareStatement(sql);
                     ps2.setInt(1, qtyDispensed); // changed from old_qty_dispensed - hadi
                     ps2.setString(2, oS); // changed from 3 to 2 - hadi
-                    ps2.setString(3, orderNo);
-                    ps2.setString(4, drugCode);
+                    if (statusDrug.equals(status_full) || statusDrug.equals(status_complete_partial)) {
+                        ps2.setInt(3, 1);
+                    } else {
+                        ps2.setInt(3, 0);
+                    }
+                    ps2.setString(4, orderNo);
+                    ps2.setString(5, drugCode);
                     stat = ps2.execute();
                   
                 }catch(Exception qq){
