@@ -23,6 +23,8 @@ import oms.rmi.db.Conn;
 import oms.rmi.util.PMImsg;
 
 public class MessageImpl extends UnicastRemoteObject implements Message {
+    
+    public final static int NUMBER_SESSION_ARRAY_SIZE = 24;
 
     public MessageImpl() throws RemoteException {
         super(Registry.REGISTRY_PORT);
@@ -2055,7 +2057,7 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 ArrayList<String> d = new ArrayList<String>();
-                for (int i = 0; i < 22; i++) {
+                for (int i = 0; i < NUMBER_SESSION_ARRAY_SIZE; i++) {
                     d.add(rs.getString(i + 1));
                 }
                 data.add(d);
@@ -2201,7 +2203,7 @@ public class MessageImpl extends UnicastRemoteObject implements Message {
             ps.setString(2, password);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
-                for (int i = 0; i < 23; i++) {
+                for (int i = 0; i < NUMBER_SESSION_ARRAY_SIZE; i++) {
                     data.add(rs.getString(i + 1));
                 }
             }
