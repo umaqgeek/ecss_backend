@@ -24,8 +24,8 @@ public class Conn {
 
         Class.forName("com.mysql.jdbc.Driver");
         // ;rewriteBatchedStatements=true for batchInsert
-        Connection SqlConn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servercis", "root", "qwerty");
-//        Connection SqlConn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servercis", "root", "");
+//        Connection SqlConn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servercis", "root", "qwerty");
+        Connection SqlConn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servercis", "root", "");
 //        Connection SqlConn = DriverManager.getConnection("jdbc:mysql://10.73.32.200:3306/servercis", "root", "qwerty");
         return SqlConn;
     }
